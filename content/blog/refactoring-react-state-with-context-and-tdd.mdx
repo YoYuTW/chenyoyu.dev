@@ -1,0 +1,98 @@
+---
+title: "Refactoring a Complex React Application's State Management with Context and TDD"
+date: "2026-02-09"
+description: "How I untangled a large-scale React application's state by designing four focused React Context providers with strict TDD — and what I learned about architecture along the way."
+tags: ["react", "tdd", "architecture", "state-management"]
+---
+
+## The Problem
+
+If you've ever worked on a large-scale, interactive React application, you know the state gets complicated fast. UI position tracking, playback status, layer selections, undo history, API integration requests, real-time messages — all of it tangled together in a web of `useState` calls and prop drilling that made every new feature feel like defusing a bomb.
+
+The codebase I inherited wasn't *bad*. It was the natural result of a product that had grown faster than its architecture. State lived wherever it was convenient at the time. Components reached deep into shared stores. Side effects triggered other side effects. The kind of code where changing a dropdown menu somehow broke the undo button.
+
+Something had to give.
+
+## The Approach
+
+I decided to refactor the state layer into **four focused Context providers**, each with a clear domain boundary:
+
+- **ApiIntegrationContext** — Managed all communication with external services. Request state, processing status, results.
+- **HistoryContext** — Undo/redo stack with snapshot-based state capture. Clean separation between "what happened" and "what's current."
+- **AppStateContext** — The orchestration layer. Position tracking, playback control, selection state. The core coordinator of the application experience.
+- **CommunicationContext** — Real-time messaging state. Connection status, message queue, optimistic updates.
+
+The rule was simple: each context owns its domain completely. No context reads from another context directly. Communication happens through the component tree or explicit event patterns.
+
+Before writing a single line of production code, I wrote the tests.
+
+## Why TDD Actually Mattered Here
+
+I'll be honest — I don't always reach for strict TDD. For UI work, I often find it more natural to prototype first and test later. But for state management architecture, TDD was essential. Here's why:
+
+**Tests forced me to define the API before the implementation.** When I sat down to write `useApiIntegration()`, I had to decide: what does a consumer actually need from this hook? What's the minimal interface? Writing the test first made me think from the consumer's perspective, not the implementation's perspective.
+
+**Tests caught architectural mistakes early.** In my first attempt, I had `HistoryContext` subscribing to `AppStateContext` changes to auto-capture snapshots. The tests made this coupling painfully obvious — I couldn't test history in isolation because it depended on application state. That friction was a signal. I redesigned it so the component that triggers a state change is also responsible for pushing to history. Much cleaner.
+
+**Tests gave me confidence to refactor aggressively.** Once I had 42 tests covering the core behaviours, I could reshape the internals freely. I rewrote the undo stack implementation three times before I was happy with it. Each time, the tests told me within seconds whether I'd broken anything.
+
+## Key Design Decision: Consumer Hooks with Selectors
+
+The pattern I settled on was a custom hook per context with an optional selector:
+
+```tsx
+// Without selector — subscribes to everything
+const api = useApiIntegration();
+
+// With selector — only re-renders when selected value changes
+const isProcessing = useApiIntegration((state) => state.isProcessing);
+const request = useApiIntegration((state) => state.request);
+```
+
+This gave consumers fine-grained control over re-renders without introducing an external state library. The selector pattern uses `useSyncExternalStore` under the hood for tear-free reads and referential equality checks.
+
+Each hook also throws a clear error if used outside its provider:
+
+```tsx
+function useApiIntegration<T>(selector?: (state: ApiIntegrationState) => T) {
+  const store = useContext(ApiIntegrationStoreContext);
+  if (!store) {
+    throw new Error("useApiIntegration must be used within an ApiIntegrationProvider");
+  }
+  return useSyncExternalStore(
+    store.subscribe,
+    () => {
+      const state = store.getSnapshot();
+      return selector ? selector(state) : state;
+    }
+  );
+}
+```
+
+Another subtle but important decision: **identity defaults**. Each context has a well-defined default state that represents "nothing is happening." This means components can safely render before data loads, without null checks or loading skeletons everywhere. The default state is a valid state.
+
+## The Results
+
+By the end of the refactor:
+
+- **42 new tests** covering all four context providers
+- **135 total tests passing** across the project
+- **Zero regressions** — every existing feature continued to work
+- **~40% reduction in component re-renders** thanks to selectors
+- **Clear domain boundaries** — new features now have an obvious "home"
+
+The undo/redo system, which had been fragile and unpredictable, became rock-solid. API integration state, which had been scattered across five components, consolidated into a single provider with three hooks. Communication state, which had been tightly coupled to the UI layer, became testable in isolation.
+
+## Lessons Learned
+
+**TDD discipline catches architectural mistakes that code review doesn't.** When you can't write a clean test, the design is telling you something. Listen to it.
+
+**Four small contexts beat one large store.** The temptation with Context is to create a "god context" that holds everything. Resist it. Domain boundaries exist for a reason. When you split by domain, each piece becomes independently testable, independently refactorable, and independently understandable.
+
+**Selectors aren't just a performance optimisation — they're documentation.** When I see `useAppState((s) => s.currentPosition)`, I know exactly what this component cares about. That's information that `const { currentPosition } = useAppState()` doesn't convey as clearly, because it doesn't tell me whether the component *also* depends on other fields that happen to be destructured elsewhere.
+
+**The best refactors are invisible to users.** Nobody noticed this change. The application works exactly the same. That's the point. The value is in the next six months of development being faster, safer, and more enjoyable.
+
+---
+
+*This is the kind of work I find most satisfying: taking a system that's growing painful and reshaping it into something that makes the next problem easier to solve. Not over-engineering. Not rewriting from scratch. Just finding the right structure for where the product is today and where it's headed tomorrow.*
