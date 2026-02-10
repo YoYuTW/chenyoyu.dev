@@ -82,15 +82,6 @@ export default function AboutPage() {
           </li>
         </ul>
 
-        <h2>What&apos;s Next</h2>
-        <p>
-          I&apos;m preparing to relocate to Australia in 2027. I&apos;m looking
-          for teams that value clear thinking, technical depth, and the kind of
-          engineer who asks &ldquo;why&rdquo; before jumping to &ldquo;how&rdquo;.
-        </p>
-        <p>
-          If that sounds like your team, I&apos;d love to have a conversation.
-        </p>
       </div>
     </div>
   );

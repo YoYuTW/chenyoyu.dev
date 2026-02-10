@@ -102,7 +102,7 @@ export default function Home() {
                 </p>
                 <div className="mt-2 flex items-center gap-3 text-xs text-muted">
                   <time dateTime={post.date}>
-                    {new Date(post.date).toLocaleDateString("en-AU", {
+                    {new Date(post.date).toLocaleDateString("en-US", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
