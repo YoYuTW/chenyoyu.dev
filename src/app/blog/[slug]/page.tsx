@@ -4,10 +4,20 @@ import { notFound } from "next/navigation";
 import { compileMDX } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import { getAllPosts, getPostBySlug } from "@/lib/blog";
+import { BlogVideoHero } from "@/components/BlogVideoHero";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
 }
+
+/**
+ * Custom MDX components available in blog posts.
+ * Client components like BlogVideoHero are passed here
+ * so they can be used directly in MDX content.
+ */
+const mdxComponents = {
+  BlogVideoHero,
+};
 
 export async function generateStaticParams() {
   const posts = getAllPosts();
@@ -41,6 +51,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   const { content } = await compileMDX({
     source: post.content,
+    components: mdxComponents,
     options: {
       mdxOptions: {
         remarkPlugins: [remarkGfm],
