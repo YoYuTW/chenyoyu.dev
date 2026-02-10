@@ -1,0 +1,164 @@
+---
+title: "The Imperative Modal Pattern: Treating Modals as Async Operations in React"
+date: "2026-02-10"
+description: "How a simple mental shift — treating modals like async function calls instead of declarative state — eliminated modal state explosion and simplified complex user interaction flows."
+tags: ["react", "typescript", "patterns", "modals"]
+---
+
+## The Problem — Modal State Explosion
+
+Here's a pattern you've probably written a hundred times:
+
+```tsx
+const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+const [confirmData, setConfirmData] = useState<ConfirmData | null>(null);
+const [onConfirmResult, setOnConfirmResult] = useState<boolean | null>(null);
+```
+
+Multiply that by every modal in your component. In the provider component I was working on — one that orchestrated an AI-driven tool call flow — I counted **12 modal-related state fields**. Open flags, data payloads, result callbacks, pending states. The component had become a switchboard operator for modals it didn't actually care about.
+
+The real pain wasn't the boilerplate, though. It was the control flow. When a modal's result feeds into subsequent logic — "show a confirmation, wait for the user's answer, then proceed or abort" — you end up threading callbacks through state updates, or building a state machine to track where you are in a multi-step flow. The async logic that should read top-to-bottom gets scattered across event handlers, effects, and state transitions.
+
+I had an AI tool call flow that looked roughly like this: receive a tool call → show a confirmation modal → if confirmed, execute the action → show a result modal → continue. With declarative modal state, this became a fire-and-forget state machine where each step set flags for the next step, and `useEffect` handlers watched for those flags to trigger the next modal. It worked, but reading it felt like following a treasure map with half the clues missing.
+
+## Reframing — Modals Are Async Operations
+
+Then I thought about `window.confirm()`. Love it or hate it, the mental model is perfect:
+
+```ts
+const confirmed = window.confirm("Are you sure?");
+if (!confirmed) return;
+// proceed...
+```
+
+Call. Wait. Get result. Continue. The flow reads linearly. The problem with `window.confirm()` is that it blocks the main thread and looks terrible — not that the API shape is wrong.
+
+What if we had the same API, but non-blocking?
+
+```ts
+const confirmed = await show({ title: "Are you sure?", message: "This cannot be undone." });
+if (!confirmed) return;
+// proceed...
+```
+
+This is the **imperative promise pattern** applied to modals. Instead of managing modal state declaratively and wiring up callbacks, you call a function that returns a Promise. The Promise resolves when the user interacts with the modal. Your async flow stays linear.
+
+## The Pattern — `useImperativeModal<TProps, TResult>`
+
+Here's the full implementation. It's surprisingly small:
+
+```tsx
+import { useCallback, useRef, useState } from "react";
+
+/**
+ * Turns any modal component into an imperative async call.
+ *
+ * TProps — the props your modal needs (minus the close/confirm handlers)
+ * TResult — the value the modal resolves with (e.g., boolean, selected item, form data)
+ */
+export function useImperativeModal<TProps, TResult>() {
+  const [modalProps, setModalProps] = useState<TProps | null>(null);
+  const resolveRef = useRef<((result: TResult) => void) | null>(null);
+
+  const show = useCallback((props: TProps): Promise<TResult> => {
+    return new Promise<TResult>((resolve) => {
+      resolveRef.current = resolve;
+      setModalProps(props);
+    });
+  }, []);
+
+  const close = useCallback((result: TResult) => {
+    resolveRef.current?.(result);
+    resolveRef.current = null;
+    setModalProps(null);
+  }, []);
+
+  return { modalProps, show, close };
+}
+```
+
+That's it. `show(props)` creates a Promise and stashes the `resolve` function in a ref. `close(result)` calls that resolve and clears the modal. The hook returns `modalProps` (which is `null` when no modal is showing) along with `show` and `close`.
+
+Here's how you use it with a confirmation modal:
+
+```tsx
+function ToolCallHandler() {
+  const { modalProps, show, close } = useImperativeModal<ConfirmModalProps, boolean>();
+
+  const handleToolCall = async (toolCall: ToolCall) => {
+    // Linear async flow — no callbacks, no state machines
+    const confirmed = await show({
+      title: "Execute tool call?",
+      description: `The AI wants to run: ${toolCall.name}`,
+      params: toolCall.params,
+    });
+
+    if (!confirmed) return;
+
+    const result = await executeToolCall(toolCall);
+    // Maybe show another modal for the result...
+  };
+
+  return (
+    <>
+      <ToolCallListener onToolCall={handleToolCall} />
+
+      {modalProps && (
+        <ConfirmModal
+          {...modalProps}
+          onConfirm={() => close(true)}
+          onCancel={() => close(false)}
+        />
+      )}
+    </>
+  );
+}
+```
+
+Notice what happened to the modal state. There's no `isOpen`. There's no `pendingToolCall`. There's no `onConfirmCallback`. The `modalProps` being non-null *is* the open state. The Promise *is* the callback. Everything collapses into two things: `show` and `close`.
+
+## Real-World Application
+
+Remember that provider component with 12 modal-related state fields? After applying this pattern, it went to **zero**. Each modal's state now lives locally, right next to the async flow that needs it. The provider doesn't need to know about modals at all.
+
+The AI tool call flow — which had been a state machine with transitions like `idle → confirming → executing → showing-result → idle` — became a simple async function:
+
+```tsx
+const handleAIResponse = async (response: AIResponse) => {
+  for (const toolCall of response.toolCalls) {
+    const confirmed = await showConfirm({
+      title: `Run "${toolCall.name}"?`,
+      details: toolCall.params,
+    });
+
+    if (!confirmed) continue;
+
+    const result = await executeToolCall(toolCall);
+
+    await showResult({
+      title: `${toolCall.name} completed`,
+      result,
+    });
+  }
+};
+```
+
+That `for` loop is doing something that previously required a state machine with five states and three effects to coordinate. Now it reads like what it *is*: a sequential flow with user interaction checkpoints.
+
+The modal components themselves also benefited. They became **pure props-based components** — no context dependency, no hooks reaching into shared state. Just props in, user interaction out. You can test them in isolation by rendering them with props and simulating clicks. You can storybook them trivially.
+
+## Trade-offs
+
+This pattern is great for modals that follow a **call-and-response** model: show something, get an answer, move on. But it's not universal.
+
+**One-shot only.** A Promise resolves once. This works perfectly for confirmations, selection dialogs, and form submissions. It doesn't work for modals that need to stay open and continuously update parent state — like a drawer with live-editing controls.
+
+**Not for persistent UI.** Multi-step wizards with back/forth navigation don't map well to a single Promise. You *could* make it work by resolving with a discriminated union of results, but at that point you're fighting the pattern rather than leveraging it.
+
+**Unmount safety.** If the component that called `show()` unmounts before the user closes the modal, the Promise just... hangs. The `resolveRef` gets garbage collected, the modal disappears (because the state is gone), and the awaiting code never resumes. In practice, this is usually fine — if the component is gone, you don't want to continue its flow anyway. But if you need cleanup, you'll want to add a reject path or use an AbortController.
+
+**Sequential only.** You can't easily show two imperative modals simultaneously from the same hook instance. If you call `show()` while a previous modal is still open, the first Promise's resolve gets overwritten. For multiple concurrent modals, you'd need multiple hook instances or a queue-based variant.
+
+---
+
+*The best patterns aren't the clever ones — they're the ones that make code read like what it does. `window.confirm()` got the API right thirty years ago. We just needed to bring it into the component model without the thread-blocking part.*
