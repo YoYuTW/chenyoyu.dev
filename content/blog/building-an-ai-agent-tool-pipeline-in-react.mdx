@@ -1,0 +1,248 @@
+---
+title: "Building an AI Agent Tool Pipeline in React: From Chaos to Collaboration"
+date: "2026-02-11"
+description: "How I replaced a monolithic switch statement with a Tool Registry and Context Injection system using Google's Gemini API, turning a blind AI agent into an informed collaborator."
+tags: ["react", "ai", "architecture", "gemini"]
+before:
+  summary: "Monolithic switch — every tool coupled to every other."
+  points:
+    - "Each new tool = touching the same function (high coupling)"
+    - "Agent couldn't see runtime IDs — updates failed silently"
+    - "No argument validation — bad args crashed at runtime"
+after:
+  summary: "Clean registry + context injection. Agent as informed collaborator."
+  points:
+    - "Tool Registry with Zod-validated handlers"
+    - "XML context injection keeps agent aware of system state"
+    - "Pure handler functions testable in isolation"
+---
+
+## The Problem — A Blind Agent in a Monolith
+
+I was building a React application — a complex interactive editor where an AI agent (powered by [Google's Gemini API](https://ai.google.dev/) via the `@google/genai` SDK) helps users manage and edit structured content. The agent uses Gemini's function calling — it receives user instructions, decides which tools to invoke, and the application executes those tool calls against its own state. Tools like `updateItem`, `generateAsset`, `exportItem`, and so on.
+
+The initial implementation was the obvious one: a `processToolCalls` function with a switch statement.
+
+```tsx
+async function processToolCalls(toolCalls: ToolCall[]) {
+  const results: ToolResult[] = [];
+
+  for (const call of toolCalls) {
+    switch (call.name) {
+      case "updateItem": {
+        const item = items.find((s) => s.id === call.args.itemId);
+        if (!item) {
+          results.push({ id: call.id, result: "Item not found" });
+          break;
+        }
+        updateItem(call.args.itemId, call.args.updates);
+        results.push({ id: call.id, result: "Item updated" });
+        break;
+      }
+      case "generateAsset": {
+        // ... 20 lines of validation, state reads, API calls
+        break;
+      }
+      case "exportItem": {
+        // ... 30 lines of prerequisite checks, modal triggers, state updates
+        break;
+      }
+      // ... 9 more cases
+    }
+  }
+
+  return results;
+}
+```
+
+At five tools, this was manageable. At twelve, the structural problems were impossible to ignore:
+
+- **High coupling.** Every new tool meant touching the same function. You couldn't add tool #13 without understanding tools #1–12 — they all shared the same closure scope, the same state variables, the same implicit dependencies.
+- **No separation of concerns.** Business logic, argument validation, state updates, and error handling were interleaved in every case block. Where does "validation" end and "business logic" begin? Nobody could tell.
+- **Impossible to test.** Each handler depended on parent component closures — `items`, `updateItem`, `showModal` — all captured implicitly. You couldn't unit test a single tool without mounting the entire component tree.
+- **No argument validation.** If Gemini returned malformed arguments (and it occasionally does), the handler would crash at runtime with an unhelpful error deep in the state update logic.
+
+But the switch wasn't the real problem. The real problem was that **the agent was blind**.
+
+Item IDs in this application are random strings generated at runtime — something like `item_a1b2c3`. The AI never saw these IDs. So when a user said "make the second item more dramatic," the agent would call `updateItem({ itemId: "item-2" })`. Nothing matched. The update failed silently. The user saw no change and tried again, and again, increasingly frustrated with an agent that appeared to understand instructions but couldn't execute them.
+
+This is the **blind agent problem**: the AI has tools, but no map. It can swing a hammer, but it can't see the nails.
+
+## The Tool Registry Pattern
+
+The first fix was structural. Instead of a switch statement that grew with every tool, I extracted each handler into a standalone function with a standardised signature.
+
+A tool handler takes validated arguments and a context object, and returns a result:
+
+```tsx
+type ToolHandler<TArgs = unknown> = (
+  args: TArgs,
+  context: ToolContext
+) => ToolResult | Promise<ToolResult>;
+
+interface ToolContext {
+  getState: () => AppState;
+  updateItem: (id: string, updates: Partial<ItemConfig>) => void;
+  showModal: (type: ModalType, props: ModalProps) => Promise<boolean>;
+  // ... other capabilities the handlers need
+}
+```
+
+The `ToolContext` is the key design decision. Instead of handlers reaching into component closures or importing global state, everything they need is injected. This makes handlers **pure functions** of their inputs — testable in isolation, decoupled from React.
+
+The registry itself is a static map with Zod schemas for argument validation:
+
+```tsx
+import { z } from "zod";
+
+const updateItemSchema = z.object({
+  itemId: z.string(),
+  updates: z.object({
+    description: z.string().optional(),
+    metadata: z.string().optional(),
+    // ...other updatable fields
+  }),
+});
+
+const toolRegistry: Record<string, ToolRegistryEntry> = {
+  updateItem: {
+    schema: updateItemSchema,
+    handler: (args, ctx) => {
+      const state = ctx.getState();
+      const item = state.items.find((s) => s.id === args.itemId);
+      if (!item) {
+        return { success: false, error: `Item ${args.itemId} not found` };
+      }
+      ctx.updateItem(args.itemId, args.updates);
+      return { success: true, message: "Item updated" };
+    },
+  },
+  generateAsset: {
+    schema: generateAssetSchema,
+    handler: handleGenerateAsset,
+  },
+  // Each tool is one entry. No switch.
+};
+```
+
+The dispatch loop becomes generic — it doesn't know or care what tools exist:
+
+```tsx
+async function processToolCalls(
+  toolCalls: ToolCall[],
+  context: ToolContext
+): Promise<ToolResult[]> {
+  const results: ToolResult[] = [];
+
+  for (const call of toolCalls) {
+    const entry = toolRegistry[call.name];
+    if (!entry) {
+      results.push({ id: call.id, error: `Unknown tool: ${call.name}` });
+      continue;
+    }
+
+    // Validate arguments with Zod
+    const parsed = entry.schema.safeParse(call.args);
+    if (!parsed.success) {
+      results.push({
+        id: call.id,
+        error: `Invalid args: ${parsed.error.message}`,
+      });
+      continue;
+    }
+
+    const result = await entry.handler(parsed.data, context);
+    results.push({ id: call.id, ...result });
+  }
+
+  return results;
+}
+```
+
+Adding a new tool now means adding one entry to the registry: a Zod schema and a handler function. No touching the dispatch logic. No scrolling through switch cases. The schema catches bad arguments before the handler runs — no more runtime crashes from missing fields.
+
+## Context Injection — Giving the Agent a Map
+
+The registry gave the agent well-structured tools. But tools are useless if the agent doesn't know what it's operating on. This is where context injection comes in.
+
+Before every user message is sent to Gemini, the application wraps it with an XML block containing the current application state:
+
+```tsx
+function injectContext(userMessage: string, state: AppState): string {
+  return `<context>
+<items>
+${state.items.map((item, i) => `  <item index="${i}" id="${item.id}">
+    <description>${item.description || "(empty)"}</description>
+    <metadata>${item.metadata || "(empty)"}</metadata>
+    <asset status="${item.asset?.status || "none"}" />
+    <export status="${item.export?.status || "none"}" />
+  </item>`).join("\n")}
+</items>
+<itemCount>${state.items.length}</itemCount>
+<projectBrief>${state.projectBrief || "(not set)"}</projectBrief>
+</context>
+
+${userMessage}`;
+}
+```
+
+So when a user types "make the second item more dramatic," what actually arrives at Gemini looks like this:
+
+```xml
+<context>
+<items>
+  <item index="0" id="item_a1b2c3">
+    <description>A quiet morning in the city</description>
+    <metadata>Wide aerial shot, golden hour</metadata>
+    <asset status="generated" />
+    <export status="none" />
+  </item>
+  <item index="1" id="item_d4e5f6">
+    <description>The protagonist walks through the market</description>
+    <metadata>Tracking shot, eye level</metadata>
+    <asset status="none" />
+    <export status="none" />
+  </item>
+</items>
+<itemCount>2</itemCount>
+<projectBrief>A day in the life of a street photographer</projectBrief>
+</context>
+
+make the second item more dramatic
+```
+
+Now the agent can see that "the second item" is `item_d4e5f6`. It calls `updateItem` with the correct ID. The update works.
+
+The system prompt reinforces this: *"Read the `<context>` block at the start of each user message. Use item IDs from there. Never fabricate IDs."*
+
+The UI shows only the user's original message. The history conversion strips the XML when rendering the chat. The enrichment is invisible — users type naturally, the system handles the rest.
+
+This pattern is powerful for three reasons:
+
+**Stateless from the AI's perspective.** Every message is self-contained. The AI doesn't need to remember item IDs from three messages ago — they're right there in the current context. This sidesteps the entire class of bugs around stale conversation state.
+
+**Always fresh.** If the user adds an item between messages, the next context block reflects it. No cache invalidation. No sync bugs. The context is generated at send time from the current state.
+
+**Invisible to the user.** They type "make item 2 more dramatic." They don't know or care about runtime IDs. The system bridges the gap between human intent and machine-addressable state.
+
+## The Results
+
+The refactored `ChatProvider` went from 559 lines to 244. The monolithic switch collapsed into a 30-line generic dispatch loop plus isolated handler functions — each in its own file, each independently testable. We added 38 new tests — unit tests for individual handlers (easy, since they're pure functions of args + context) and integration tests for the full tool call pipeline.
+
+Silent failures became proper error messages. The agent went from a frustrating black box that seemed to understand but couldn't act, to a collaborator that reliably executed multi-step edits across content items.
+
+A few gotchas worth mentioning for anyone building on the `@google/genai` SDK: Gemini's `FunctionCall.id` can be `undefined` in some edge cases — you need to handle that. The model sometimes returns empty text responses between tool call rounds — don't treat those as errors. And when responding to multiple tool calls in one round, batch all the function responses into a single API call rather than sending them individually.
+
+## The Takeaway
+
+I built this with Google's Gemini API, but the patterns apply to any LLM with function calling — OpenAI, Anthropic, or otherwise:
+
+1. **A typed, validated tool registry** instead of ad-hoc dispatch. Zod schemas catch bad arguments before they reach your business logic.
+2. **Runtime context injection** so the agent always has current state. Don't assume the AI remembers what it saw five messages ago — tell it what's true *right now*.
+3. **Pure handler functions** separated from the framework. Your tool logic shouldn't depend on React hooks, Vue reactivity, or any framework primitive. Inject what handlers need; don't let them reach for it.
+
+The shift is from "AI as a black box that sometimes works" to "AI as an informed collaborator with clear tools and fresh context." The agent isn't magic. It's a function that takes context and returns actions. Give it better context, give it validated tools, and it becomes genuinely useful.
+
+---
+
+*The hardest part of building with AI agents isn't the AI — it's the plumbing. The prompts, the tool definitions, the state synchronisation. Get that right, and the AI almost takes care of itself. Get it wrong, and no amount of prompt engineering will save you from an agent that can't see what it's working with.*
