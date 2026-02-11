@@ -1,49 +1,137 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafafa;
-  --foreground: #171717;
-  --muted: #737373;
-  --border: #e5e5e5;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --code-bg: #f5f5f5;
-  --card-bg: #ffffff;
+  /* === Background Hierarchy === */
+  --background: #fafaf9;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f5f5f4;
+  --bg-overlay: #e7e5e4;
+
+  /* === Foreground Hierarchy === */
+  --foreground: #1c1917;
+  --fg-secondary: #78716c;
+  --fg-tertiary: #a8a29e;
+
+  /* === Accent === */
+  --accent: #ea580c;
+  --accent-hover: #c2410c;
+  --accent-muted: #ea580c26;
+  --accent-secondary: #0891b2;
+  --accent-secondary-muted: #0891b226;
+
+  /* === Semantic === */
+  --chaos: #dc2626;
+  --chaos-muted: #dc262626;
+  --order: #16a34a;
+  --order-muted: #16a34a26;
+
+  /* === Borders === */
+  --border: #e7e5e4;
+  --border-hover: #d6d3d1;
+  --border-accent: #ea580c33;
+
+  /* === Aliases (backward compat) === */
+  --code-bg: var(--bg-overlay);
+  --card-bg: var(--bg-surface);
+  --muted: var(--fg-secondary);
+}
+
+.dark {
+    --background: #09090b;
+    --bg-surface: #131316;
+    --bg-elevated: #1c1c21;
+    --bg-overlay: #25252b;
+
+    --foreground: #f0f0f3;
+    --fg-secondary: #a0a0ab;
+    --fg-tertiary: #63636e;
+
+    --accent: #f59e0b;
+    --accent-hover: #fbbf24;
+    --accent-muted: #f59e0b26;
+    --accent-secondary: #06b6d4;
+    --accent-secondary-muted: #06b6d426;
+
+    --chaos: #ef4444;
+    --chaos-muted: #ef444426;
+    --order: #22c55e;
+    --order-muted: #22c55e26;
+
+    --border: #25252b;
+    --border-hover: #3f3f46;
+    --border-accent: #f59e0b33;
+
+    --code-bg: var(--bg-overlay);
+    --card-bg: var(--bg-surface);
+    --muted: var(--fg-secondary);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-overlay: var(--bg-overlay);
+
   --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-secondary-muted: var(--accent-secondary-muted);
+
+  --color-chaos: var(--chaos);
+  --color-chaos-muted: var(--chaos-muted);
+  --color-order: var(--order);
+  --color-order-muted: var(--order-muted);
+
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-border-accent: var(--border-accent);
+
   --color-code-bg: var(--code-bg);
   --color-card-bg: var(--card-bg);
+
+  /* Backward compat: --color-muted maps to fg-secondary */
+  --color-muted: var(--fg-secondary);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #a3a3a3;
-    --border: #262626;
-    --accent: #60a5fa;
-    --accent-hover: #93bbfd;
-    --code-bg: #1a1a1a;
-    --card-bg: #141414;
+/* === Accessibility: Reduced Motion === */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
+/* === Accessibility: Focus Indicators === */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* === Base === */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* MDX prose styles */
+/* === MDX Prose Styles === */
 .prose {
   --prose-body: var(--foreground);
   --prose-headings: var(--foreground);
@@ -119,22 +207,22 @@ body {
   border-left: 3px solid var(--accent);
   padding-left: 1rem;
   margin: 1.5rem 0;
-  color: var(--muted);
+  color: var(--fg-secondary);
   font-style: italic;
 }
 
 .prose code {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 0.875em;
-  background: var(--code-bg);
+  background: var(--bg-overlay);
   padding: 0.15em 0.35em;
   border-radius: 0.25rem;
 }
 
 .prose pre {
-  background: var(--code-bg);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   padding: 1rem 1.25rem;
   overflow-x: auto;
   margin: 1.5rem 0;
@@ -160,24 +248,68 @@ body {
 }
 
 .prose img {
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   margin: 1.5rem 0;
 }
 
-/* Code block title from rehype-pretty-code */
+/* === Code Block Title (rehype-pretty-code) === */
 [data-rehype-pretty-code-title] {
-  background: var(--code-bg);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-bottom: none;
-  border-radius: 0.5rem 0.5rem 0 0;
+  border-radius: 0.75rem 0.75rem 0 0;
   padding: 0.5rem 1rem;
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 0.8125rem;
-  color: var(--muted);
+  color: var(--fg-secondary);
 }
 
 [data-rehype-pretty-code-title] + pre {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   margin-top: 0;
+}
+
+/* === Highlighted Lines (rehype-pretty-code) === */
+[data-highlighted-line] {
+  background: var(--accent-muted);
+  border-left: 2px solid var(--accent);
+  margin-left: -1.25rem;
+  margin-right: -1.25rem;
+  padding-left: calc(1.25rem - 2px);
+  padding-right: 1.25rem;
+}
+
+/* === Nav Link Sliding Underline === */
+.nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+/* === External Link Arrow Animation === */
+.external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.external-link-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease-out;
+}
+
+.external-link:hover .external-link-arrow {
+  transform: translateX(4px);
 }

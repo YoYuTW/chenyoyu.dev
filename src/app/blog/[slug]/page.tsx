@@ -5,6 +5,8 @@ import { compileMDX } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import { getAllPosts, getPostBySlug } from "@/lib/blog";
 import { BlogVideoHero } from "@/components/BlogVideoHero";
+import { ProblemStatement } from "@/components/blog/ProblemStatement";
+import { Pre } from "@/components/ui/CodeBlock";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -17,6 +19,7 @@ interface BlogPostPageProps {
  */
 const mdxComponents = {
   BlogVideoHero,
+  pre: Pre,
 };
 
 export async function generateStaticParams() {
@@ -60,19 +63,19 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   });
 
   return (
-    <article className="mx-auto max-w-2xl px-6 py-16">
+    <article className="mx-auto max-w-5xl px-6 py-16 sm:px-8">
       {/* Header */}
-      <header className="mb-10">
+      <header className="mx-auto mb-10 max-w-[65ch]">
         <Link
           href="/blog"
-          className="text-sm text-muted hover:text-foreground transition-colors mb-6 inline-block"
+          className="mb-6 inline-block text-sm text-fg-secondary transition-colors hover:text-foreground"
         >
           ← Back to blog
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl leading-tight">
+        <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
           {post.title}
         </h1>
-        <div className="mt-3 flex items-center gap-3 text-sm text-muted">
+        <div className="mt-3 flex items-center gap-3 text-sm text-fg-secondary">
           <time dateTime={post.date}>
             {new Date(post.date).toLocaleDateString("en-AU", {
               year: "numeric",
@@ -84,27 +87,35 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           <span>{post.readingTime}</span>
         </div>
         {post.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <ul aria-label="Tags" className="mt-3 flex flex-wrap gap-2">
             {post.tags.map((tag) => (
-              <span
+              <li
                 key={tag}
-                className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted"
+                className="rounded-full border border-border bg-bg-overlay px-2.5 py-0.5 text-xs text-fg-secondary transition-colors hover:border-accent-muted hover:text-accent"
               >
                 {tag}
-              </span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </header>
 
-      {/* MDX Content */}
-      <div className="prose">{content}</div>
+      {/* Problem Statement Card — shown for posts with before data */}
+      {post.before && (
+        <ProblemStatement
+          summary={post.before.summary}
+          points={post.before.points}
+        />
+      )}
+
+      {/* MDX Content — constrained to 65ch for optimal reading width */}
+      <div className="prose mx-auto">{content}</div>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-border pt-8">
+      <footer className="mx-auto mt-16 max-w-[65ch] border-t border-border pt-8">
         <Link
           href="/blog"
-          className="text-sm text-accent hover:text-accent-hover transition-colors"
+          className="text-sm text-accent transition-colors hover:text-accent-hover"
         >
           ← Back to all posts
         </Link>

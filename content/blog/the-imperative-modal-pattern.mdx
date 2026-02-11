@@ -3,6 +3,18 @@ title: "The Imperative Modal Pattern: Treating Modals as Async Operations in Rea
 date: "2026-02-10"
 description: "How a simple mental shift — treating modals like async function calls instead of declarative state — eliminated modal state explosion and simplified complex user interaction flows."
 tags: ["react", "typescript", "patterns", "modals"]
+before:
+  summary: "12 modal state fields in one provider"
+  points:
+    - "State explosion per modal"
+    - "Callbacks threaded through state"
+    - "useEffect watchers for flow control"
+after:
+  summary: "Zero. Modals as async function calls."
+  points:
+    - "Imperative promise pattern"
+    - "Linear async/await control flow"
+    - "Each modal testable in isolation"
 ---
 
 <BlogVideoHero composition="imperative-modal-cinematic" />

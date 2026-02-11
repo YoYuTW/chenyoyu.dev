@@ -3,6 +3,18 @@ title: "Refactoring a Complex React Application's State Management with Context 
 date: "2026-02-09"
 description: "How I untangled a large-scale React application's state by designing four focused React Context providers with strict TDD — and what I learned about architecture along the way."
 tags: ["react", "tdd", "architecture", "state-management"]
+before:
+  summary: "Tangled state scattered across the component tree"
+  points:
+    - "useState calls everywhere"
+    - "Prop drilling 4 levels deep"
+    - "Changing a dropdown broke undo"
+after:
+  summary: "Four focused Context providers with clear domain boundaries"
+  points:
+    - "Each context owns its domain completely"
+    - "135 tests, all passing"
+    - "New features no longer feel like defusing a bomb"
 ---
 
 ## The Problem

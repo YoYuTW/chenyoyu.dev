@@ -1,49 +1,22 @@
-import Link from "next/link";
 import { getAllPosts } from "@/lib/blog";
+import { BeforeAfterCard } from "@/components/blog/BeforeAfterCard";
+import { BlogCard } from "@/components/blog/BlogCard";
+import { HeroChaosOrder } from "@/components/hero/HeroChaosOrder";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { StaggerGroup } from "@/components/motion/StaggerGroup";
 
 export default function Home() {
   const recentPosts = getAllPosts().slice(0, 3);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
-      {/* Hero */}
-      <section className="mb-16">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          Hi, I&apos;m YoYu Chen.
-        </h1>
-        <p className="mt-4 text-lg text-muted leading-relaxed">
-          I solve problems with software. I specialise in complex front-end
-          applications and full-stack solutions using React, TypeScript, and
-          Node.js.
-        </p>
-        <p className="mt-3 text-lg text-muted leading-relaxed">
-          Every project starts with a question:{" "}
-          <em className="text-foreground not-italic font-medium">
-            &ldquo;What&apos;s the actual problem here?&rdquo;
-          </em>
-        </p>
-        <div className="mt-8 flex items-center gap-4">
-          <Link
-            href="/blog"
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80"
-          >
-            Read the Blog
-          </Link>
-          <Link
-            href="/about"
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card-bg"
-          >
-            About Me
-          </Link>
-        </div>
-      </section>
+    <div className="mx-auto max-w-5xl px-6 py-16 sm:px-8 sm:py-24">
+      {/* Hero: Chaos → Order animation */}
+      <HeroChaosOrder />
 
-      {/* What I Do */}
+      {/* What I Work On */}
       <section className="mb-16">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted mb-6">
-          What I Work On
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <SectionHeader label="What I Work On" />
+        <StaggerGroup className="grid gap-4 sm:grid-cols-2">
           {[
             {
               title: "Complex Front-End Apps",
@@ -64,56 +37,33 @@ export default function Home() {
           ].map(({ title, desc }) => (
             <div
               key={title}
-              className="rounded-lg border border-border bg-card-bg p-4"
+              className="rounded-lg border border-border bg-bg-surface p-4"
             >
               <h3 className="font-medium text-foreground">{title}</h3>
-              <p className="mt-1 text-sm text-muted leading-relaxed">{desc}</p>
+              <p className="mt-1 text-sm leading-relaxed text-fg-secondary">
+                {desc}
+              </p>
             </div>
           ))}
-        </div>
+        </StaggerGroup>
       </section>
 
       {/* Recent Posts */}
       {recentPosts.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
-              Recent Writing
-            </h2>
-            <Link
-              href="/blog"
-              className="text-sm text-accent hover:text-accent-hover transition-colors"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="flex flex-col gap-4">
-            {recentPosts.map((post) => (
-              <Link
-                key={post.slug}
-                href={`/blog/${post.slug}`}
-                className="group rounded-lg border border-border bg-card-bg p-4 transition-colors hover:border-accent/30"
-              >
-                <h3 className="font-medium text-foreground group-hover:text-accent transition-colors">
-                  {post.title}
-                </h3>
-                <p className="mt-1 text-sm text-muted line-clamp-2">
-                  {post.description}
-                </p>
-                <div className="mt-2 flex items-center gap-3 text-xs text-muted">
-                  <time dateTime={post.date}>
-                    {new Date(post.date).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </time>
-                  <span>·</span>
-                  <span>{post.readingTime}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <SectionHeader
+            label="Recent Writing"
+            action={{ text: "View all →", href: "/blog" }}
+          />
+          <StaggerGroup className="flex flex-col gap-6">
+            {recentPosts.map((post) =>
+              post.before && post.after ? (
+                <BeforeAfterCard key={post.slug} post={post} />
+              ) : (
+                <BlogCard key={post.slug} post={post} />
+              ),
+            )}
+          </StaggerGroup>
         </section>
       )}
     </div>

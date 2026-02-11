@@ -27,9 +27,16 @@ export const COMPOSITIONS: Record<
  */
 export const COMPOSITION_META: Record<
   string,
-  { durationInFrames: number; fps: number; width: number; height: number }
+  {
+    title: string;
+    durationInFrames: number;
+    fps: number;
+    width: number;
+    height: number;
+  }
 > = {
   "imperative-modal-cinematic": {
+    title: "The Imperative Modal Pattern",
     durationInFrames: 600, // 20s at 30fps
     fps: 30,
     width: 1920,

@@ -67,6 +67,8 @@ export function BlogVideoHero({ composition }: BlogVideoHeroProps) {
 
   return (
     <div
+      role="region"
+      aria-label={`Video walkthrough: ${meta.title ?? composition}`}
       style={{
         marginBottom: 32,
         borderRadius: 12,
