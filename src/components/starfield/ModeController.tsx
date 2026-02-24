@@ -7,15 +7,20 @@ import { ConstellationLines } from './ConstellationLines';
 import { calculateGMST, calculateLST } from '../../lib/astronomy';
 import { useGeolocation } from '../../hooks/useGeolocation';
 
-interface ModeControllerProps {
+export interface StarfieldMode {
+  flashlightRadius: number;
+  showConstellationLines: boolean;
+  baseBrightness: number;
+}
+
+interface ModeControllerProps extends StarfieldMode {
   data: StarfieldData;
 }
 
 const SPHERE_RADIUS = 100.0;
-const FLASHLIGHT_RADIUS = 25.0; 
 const FADE_DURATION = 3.0; 
 
-export function ModeController({ data }: ModeControllerProps) {
+export function ModeController({ data, flashlightRadius, showConstellationLines, baseBrightness }: ModeControllerProps) {
   const { camera, pointer } = useThree();
   const location = useGeolocation();
   
@@ -33,7 +38,8 @@ export function ModeController({ data }: ModeControllerProps) {
   const stateRef = useRef<StarfieldFrameState>({
     lst: 0,
     cursorPos: new THREE.Vector3(0, 0, -SPHERE_RADIUS),
-    flashlightRadius: FLASHLIGHT_RADIUS,
+    flashlightRadius: flashlightRadius,
+    baseBrightness: baseBrightness,
     opacities: new Float32Array(88),
     latitude: location.latitude,
   });
@@ -43,9 +49,13 @@ export function ModeController({ data }: ModeControllerProps) {
   // Track last active times for fading logic (CPU side only)
   const lastActiveTimes = useRef<Float32Array>(new Float32Array(88).fill(-999));
   
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
     const now = new Date();
+    
+    // Smoothly transition parameters
+    stateRef.current.flashlightRadius = THREE.MathUtils.lerp(stateRef.current.flashlightRadius, flashlightRadius, delta * 2);
+    stateRef.current.baseBrightness = THREE.MathUtils.lerp(stateRef.current.baseBrightness, baseBrightness, delta * 2);
     
     // 1. Update LST
     const gmst = calculateGMST(now);
@@ -100,7 +110,8 @@ export function ModeController({ data }: ModeControllerProps) {
       const dz = wz * SPHERE_RADIUS - vector.z;
       const distSq = dx*dx + dy*dy + dz*dz;
       
-      const radiusSq = FLASHLIGHT_RADIUS * FLASHLIGHT_RADIUS;
+      const currentRadius = stateRef.current.flashlightRadius;
+      const radiusSq = currentRadius * currentRadius;
       
       if (distSq < radiusSq) {
         // NEW: Log when a constellation is newly activated
@@ -129,10 +140,12 @@ export function ModeController({ data }: ModeControllerProps) {
         data={data} 
         stateRef={stateRef}
       />
-      <ConstellationLines 
-        data={data} 
-        stateRef={stateRef}
-      />
+      {showConstellationLines && (
+        <ConstellationLines 
+          data={data} 
+          stateRef={stateRef}
+        />
+      )}
     </>
   );
 }

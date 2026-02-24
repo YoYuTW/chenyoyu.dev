@@ -2,11 +2,24 @@
 
 import { Canvas } from '@react-three/fiber';
 import { useStarData } from '../../hooks/useStarData';
-import { ModeController } from './ModeController';
+import { ModeController, StarfieldMode } from './ModeController';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+
+function getStarfieldMode(pathname: string | null): StarfieldMode {
+  if (!pathname || pathname === '/') {
+    return { flashlightRadius: 25, showConstellationLines: true, baseBrightness: 0.15 };
+  }
+  if (pathname.startsWith('/blog')) {
+    return { flashlightRadius: 12, showConstellationLines: false, baseBrightness: 0.08 };
+  }
+  // /about and everything else
+  return { flashlightRadius: 25, showConstellationLines: false, baseBrightness: 0.15 };
+}
 
 export default function StarfieldCanvas() {
+  const pathname = usePathname();
   const { resolvedTheme } = useTheme();
   const starData = useStarData();
   const [mounted, setMounted] = useState(false);
@@ -19,6 +32,7 @@ export default function StarfieldCanvas() {
   if (starData.loading) return null;
 
   const isDark = resolvedTheme === 'dark';
+  const mode = getStarfieldMode(pathname);
   
   return (
     <div 
@@ -36,7 +50,7 @@ export default function StarfieldCanvas() {
         eventSource={document.body} // Listen to events on body so we get mouse movement even with pointer-events: none
         eventPrefix="client"
       >
-        <ModeController data={starData} />
+        <ModeController data={starData} {...mode} />
       </Canvas>
     </div>
   );

@@ -8,6 +8,7 @@ export interface StarfieldFrameState {
   lst: number;
   cursorPos: THREE.Vector3;
   flashlightRadius: number;
+  baseBrightness: number;
   opacities: Float32Array;
   latitude: number;
 }
@@ -27,6 +28,7 @@ export function Stars({ data, stateRef }: StarsProps) {
         uLatitude: { value: 0 },
         uCursorPos: { value: new THREE.Vector3() },
         uFlashlightRadius: { value: 0 },
+        uBaseBrightness: { value: 0.15 },
         uPixelRatio: { value: 1 },
       },
       vertexShader: /* glsl */ `
@@ -91,6 +93,7 @@ export function Stars({ data, stateRef }: StarsProps) {
         
         uniform vec3 uCursorPos;
         uniform float uFlashlightRadius;
+        uniform float uBaseBrightness;
         
         void main() {
           vec2 coord = gl_PointCoord - vec2(0.5);
@@ -112,7 +115,7 @@ export function Stars({ data, stateRef }: StarsProps) {
           
           float d = distance(vWorldPos, uCursorPos);
           float flashlight = smoothstep(uFlashlightRadius * 1.5, uFlashlightRadius * 0.5, d);
-          float brightness = 0.15 + 0.85 * flashlight;
+          float brightness = uBaseBrightness + (1.0 - uBaseBrightness) * flashlight;
           if (vMag < 1.0) brightness += 0.1;
           
           gl_FragColor = vec4(color, alpha * brightness);
@@ -133,6 +136,7 @@ export function Stars({ data, stateRef }: StarsProps) {
         mat.uniforms.uLatitude.value = s.latitude;
         mat.uniforms.uCursorPos.value.copy(s.cursorPos);
         mat.uniforms.uFlashlightRadius.value = s.flashlightRadius;
+        mat.uniforms.uBaseBrightness.value = s.baseBrightness;
         mat.uniforms.uPixelRatio.value = state.viewport.dpr;
       }
     }
