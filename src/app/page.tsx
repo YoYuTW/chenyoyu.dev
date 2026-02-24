@@ -1,7 +1,7 @@
+import Link from "next/link";
 import { getAllPosts } from "@/lib/blog";
 import { BeforeAfterCard } from "@/components/blog/BeforeAfterCard";
 import { BlogCard } from "@/components/blog/BlogCard";
-import { HeroChaosOrder } from "@/components/hero/HeroChaosOrder";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StaggerGroup } from "@/components/motion/StaggerGroup";
 
@@ -10,8 +10,29 @@ export default function Home() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-16 sm:px-8 sm:py-24">
-      {/* Hero: Chaos → Order animation */}
-      <HeroChaosOrder />
+      {/* Hero */}
+      <section className="mb-24 flex flex-col items-center justify-center text-center">
+        <h1 className="mb-8 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
+          I turn messy problems
+          <br className="hidden sm:block" />
+          into clear solutions.
+        </h1>
+        
+        <div className="flex flex-wrap justify-center gap-4">
+          <Link
+            href="/blog"
+            className="inline-flex items-center rounded-lg bg-accent px-6 py-3 text-base font-medium text-background transition-all hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-[0_4px_12px_var(--accent-muted)] active:translate-y-0 active:shadow-none"
+          >
+            Read the Blog
+          </Link>
+          <Link
+            href="/about"
+            className="inline-flex items-center rounded-lg border border-border bg-bg-surface/50 px-6 py-3 text-base font-medium text-foreground backdrop-blur-sm transition-all hover:border-border-hover hover:bg-bg-elevated/80"
+          >
+            About Me
+          </Link>
+        </div>
+      </section>
 
       {/* What I Work On */}
       <section className="mb-16">
@@ -37,7 +58,7 @@ export default function Home() {
           ].map(({ title, desc }) => (
             <div
               key={title}
-              className="rounded-lg border border-border bg-bg-surface p-4"
+              className="rounded-lg border border-border bg-bg-surface/80 p-4 backdrop-blur-sm"
             >
               <h3 className="font-medium text-foreground">{title}</h3>
               <p className="mt-1 text-sm leading-relaxed text-fg-secondary">
